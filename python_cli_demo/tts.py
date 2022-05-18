@@ -62,8 +62,14 @@ async def transferMsTTSData(SSML_text, outputPath):
             getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_2
         await websocket.send(message_2)
 
-        # payload_3 = '<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"><voice name="' + voice + '"><mstts:express-as style="General"><prosody rate="'+spd+'%" pitch="'+ptc+'%">'+ msg_content +'</prosody></mstts:express-as></voice></speak>'
-        payload_3 = SSML_text
+        spd='0'
+        ptc='0'
+        voice='zh-CN-XiaoxiaoNeural'
+        msg_content=' 这是普渡自研究语音链路，普渡科技'
+        payload_3 = '<speak xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="http://www.w3.org/2001/mstts" xmlns:emo="http://www.w3.org/2009/10/emotionml" version="1.0" xml:lang="en-US"><voice name="' + voice + '"><prosody rate="'+spd+'%" pitch="'+ptc+'%">'+ msg_content +'</prosody></voice></speak>'
+        #print(payload_3)
+        #payload_3 = SSML_text
+        #print(payload_3)
         message_3 = 'Path: ssml\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
         await websocket.send(message_3)
