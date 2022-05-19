@@ -9,6 +9,9 @@ import re
 import uuid
 import argparse
 
+from os import path
+from pydub import AudioSegment
+
 import websocket as ws
 
 ws_fd = object()
@@ -79,12 +82,17 @@ async def transferMsTTSData(SSML_text, outputPath):
         message_3 = 'Path: ssml\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
             getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
         await websocket.send(message_3)
+        start = getXTime()
 
         # Checks for close connection message
         end_resp_pat = re.compile('Path:turn.end')
         audio_stream = b''
         while(True):
             response = await websocket.recv()
+            end = getXTime()
+            #print(end - start)
+            print(start)
+            print(end)
             print('receiving...')
             # Make sure the message isn't telling us to stop
             if (re.search(end_resp_pat, str(response)) == None):
@@ -95,9 +103,9 @@ async def transferMsTTSData(SSML_text, outputPath):
                         start_ind = str(response).find('Path:audio')
                         #audio_string += str(response)[start_ind+14:-1]
                         tmp = response[start_ind-2:]
-                        audio_stream += tmp 
+                        audio_stream += tmp
                         #print(audio_stream, type(audio_stream))
-                        await ws_fd.send(tmp)
+                        #await ws_fd.send(tmp)
                         print(len(tmp))
                     except:
                         pass
@@ -105,6 +113,10 @@ async def transferMsTTSData(SSML_text, outputPath):
                 break
         with open(f'{outputPath}.mp3', 'wb') as audio_out:
             audio_out.write(audio_stream)
+        sound = AudioSegment.from_mp3(f'{outputPath}.mp3')
+        sound.export(f'{outputPath}.wav', format="wav")
+        url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
+        await ws_fd.send(url)
 
 
 async def mainSeq(SSML_text, outputPath):
@@ -133,14 +145,16 @@ async def gate(ws):
     await ws_fd.send('test1'.encode('utf-8'))
     '''
 
-    args = parseArgs()
-    SSML_text = get_SSML(args.input)
-    output_path = args.output if args.output else 'output_'+ str(int(time.time()*1000))
+    #args = parseArgs()
+    #SSML_text = get_SSML(args.input)
+    #output_path = args.output if args.output else 'output_'+ str(int(time.time()*1000))
     #asyncio.get_event_loop().run_until_complete(mainSeq(SSML_text, output_path))
+    SSML_text=0
+    output_path = 'output_'+ str(int(time.time()*1000))
     await mainSeq(SSML_text, output_path)
 
 async def main():
-    async with websockets.serve(gate, "localhost", 8766, max_size = 10752000):
+    async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
         await asyncio.Future()  # run forever
 
 
