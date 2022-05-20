@@ -142,6 +142,8 @@ async def gate(ws):
     global msg_content
     ws_fd = ws
     async for message in ws:
+        if message == '':
+            message = '内容不能为空'
         msg_content = message
         print(f'recv: {message}')
         SSML_text=0
