@@ -83,6 +83,7 @@ async def transferMsTTSData(SSML_text, outputPath):
             getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
         await websocket.send(message_3)
         start = getXTime()
+        print(start)
 
         # Checks for close connection message
         end_resp_pat = re.compile('Path:turn.end')
@@ -91,9 +92,7 @@ async def transferMsTTSData(SSML_text, outputPath):
             response = await websocket.recv()
             end = getXTime()
             #print(end - start)
-            print(start)
-            print(end)
-            print('receiving...')
+            #print('receiving...')
             # Make sure the message isn't telling us to stop
             if (re.search(end_resp_pat, str(response)) == None):
                 # Check if our response is text data or the audio bytes
@@ -106,17 +105,25 @@ async def transferMsTTSData(SSML_text, outputPath):
                         audio_stream += tmp
                         #print(audio_stream, type(audio_stream))
                         #await ws_fd.send(tmp)
-                        print(len(tmp))
+                        #print(len(tmp))
                     except:
                         pass
             else:
                 break
+        print('.........')
         with open(f'{outputPath}.mp3', 'wb') as audio_out:
             audio_out.write(audio_stream)
         sound = AudioSegment.from_mp3(f'{outputPath}.mp3')
+        sound = sound.set_channels(2)
         sound.export(f'{outputPath}.wav', format="wav")
         url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
-        await ws_fd.send(url)
+        with open(f'{outputPath}.wav', 'rb') as f:
+            res = f.read(44)
+            while True:
+                res = f.read(1024)
+                if len(res) == 0:
+                    break
+                await ws_fd.send(res)
 
 
 async def mainSeq(SSML_text, outputPath):
@@ -134,24 +141,24 @@ async def gate(ws):
     global ws_fd
     global msg_content
     ws_fd = ws
+    async for message in ws:
+        msg_content = message
+        print(f'recv: {message}')
+        SSML_text=0
+        output_path = 'output_'+ str(int(time.time()*1000))
+        await mainSeq(SSML_text, output_path)
+        print('exit')
+        await ws.send(b'\x03\xe8')
+
+
+    '''
     msg_content = await ws.recv()
     print(f'recv: {msg_content}')
-
-    '''
-    await ws_fd.send('test1'.encode('utf-8'))
-    await ws_fd.send('test1'.encode('utf-8'))
-    await ws_fd.send('test1'.encode('utf-8'))
-    await ws_fd.send('test1'.encode('utf-8'))
-    await ws_fd.send('test1'.encode('utf-8'))
-    '''
-
-    #args = parseArgs()
-    #SSML_text = get_SSML(args.input)
-    #output_path = args.output if args.output else 'output_'+ str(int(time.time()*1000))
-    #asyncio.get_event_loop().run_until_complete(mainSeq(SSML_text, output_path))
     SSML_text=0
     output_path = 'output_'+ str(int(time.time()*1000))
     await mainSeq(SSML_text, output_path)
+    print('-----exit')
+    '''
 
 async def main():
     async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
