@@ -8,13 +8,13 @@ import time
 import re
 import uuid
 import argparse
+import _thread
 
 from os import path
 from pydub import AudioSegment
 
 import websocket as ws
 
-msg_content = ''
 ttsServer = object()
 
 class TTSServer():
@@ -23,7 +23,7 @@ class TTSServer():
         self.connect_websocket()
 
 
-    def connect_websocket(self):
+    async def connect_websocket(self):
         start = getXTime()
         print("\nauth time start: " + start + "\n")
         endpoint1 = "https://azure.microsoft.com/en-gb/services/cognitive-services/text-to-speech/"
@@ -43,17 +43,17 @@ class TTSServer():
             payload_1 = '{"context":{"system":{"name":"SpeechSDK","version":"1.12.1-rc.1","build":"JavaScript","lang":"JavaScript","os":{"platform":"Browser/Linux x86_64","name":"Mozilla/5.0 (X11; Linux x86_64; rv:78.0) Gecko/20100101 Firefox/78.0","version":"5.0 (X11)"}}}}'
             message_1 = 'Path : speech.config\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
                 getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_1
-            self.websocket.send(message_1)
+            await self.websocket.send(message_1)
 
             payload_2 = '{"synthesis":{"audio":{"metadataOptions":{"sentenceBoundaryEnabled":false,"wordBoundaryEnabled":false},"outputFormat":"audio-16khz-32kbitrate-mono-mp3"}}}'
             message_2 = 'Path : synthesis.context\r\nX-RequestId: ' + req_id + '\r\nX-Timestamp: ' + \
                 getXTime() + '\r\nContent-Type: application/json\r\n\r\n' + payload_2
-            self.websocket.send(message_2)
+            await self.websocket.send(message_2)
 
     async def start_conver(self, content:str, fd:object):
         start = getXTime()
         print("\nauth time end:" + start +"\n")
-        
+
         spd='0'
         ptc='0'
         voice='zh-CN-XiaoxiaoNeural'
@@ -110,14 +110,6 @@ class TTSServer():
                     break
                 await fd.send(res)
 
-'''命令行参数解析'''
-def parseArgs():
-    parser = argparse.ArgumentParser(description='text2speech')
-    parser.add_argument('--input', dest='input', help='SSML(语音合成标记语言)的路径', type=str, required=True)
-    parser.add_argument('--output', dest='output', help='保存mp3文件的路径', type=str, required=False)
-    args = parser.parse_args()
-    return args
-
 # Fix the time to match Americanisms
 def hr_cr(hr):
     corrected = (hr - 1) % 24
@@ -131,7 +123,7 @@ def fr(input_string):
         corr += '0'
         i -= 1
     return corr + input_string
-msg_content
+
 # Generate X-Timestamp all correctly formatted
 def getXTime():
     now = datetime.now()
@@ -247,7 +239,7 @@ async def gate(ws):
         msg_content = message
         print(f'recv: {message}')
         # SSML_text=0
-        # output_path = 'output_'+ str(int(time.time()*1000))
+        output_path = 'output_'+ str(int(time.time()*1000))
         # await mainSeq(SSML_text, output_path, ws)
         await mainSeq(msg_content, output_path, ws)
         print('exit')
@@ -262,21 +254,11 @@ async def gate(ws):
     await mainSeq(SSML_text, output_path)
     print('-----exit')
     '''
-
 async def main():
     async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
         await asyncio.Future()  # run forever
 
-
 if __name__ == "__main__":
-    '''
-    args = parseArgs()
-    SSML_text = get_SSML(args.input)
-    output_path = args.output if args.output else 'output_'+ str(int(time.time()*1000))
-    asyncio.get_event_loop().run_until_complete(mainSeq(SSML_text, output_path))
-    '''
-    ttsServer = TTSServer() 
+    ttsServer = TTSServer()
     asyncio.run(main())
     print('completed')
-    # python tts.py --input SSML.xml
-    # python tts.py --input SSML.xml --output 保存文件名
