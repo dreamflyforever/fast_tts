@@ -147,6 +147,8 @@ class TTSClss():
             print('before msg get')
             ttsMsg = msg_que.get()
             print('ttsMsg', ttsMsg)
+            start = self.getXTime()
+            print("\nauth time start:" + start +"\n")
             if  Auth_Token== '':
                 endpoint1 = "https://azure.microsoft.com/en-gb/services/cognitive-services/text-to-speech/"
                 r = requests.get(endpoint1)
@@ -197,7 +199,7 @@ async def gate(ws):
         # await ws.send(b'\x03\xe8')
 
 async def tts_server():
-    async with websockets.serve(gate, "192.168.31.162", 8766, max_size = 10752000):
+    async with websockets.serve(gate, "192.168.52.98", 8766, max_size = 10752000):
         await asyncio.Future()  # run forever
 
 def convet_process():
