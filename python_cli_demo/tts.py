@@ -8,6 +8,7 @@ import time
 import re
 import uuid
 import argparse
+import hashtable
 
 from os import path
 from pydub import AudioSegment
@@ -127,6 +128,7 @@ async def transferMsTTSData(SSML_text, outputPath):
         start = getXTime()
         print("\nready send...:" + start +"\n")
         url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
+        hashtable.add(msg_content, f'{outputPath}.wav')
         with open(f'{outputPath}.wav', 'rb') as f:
             res = f.read(44)
             while True:
@@ -153,14 +155,27 @@ async def gate(ws):
     ws_fd = ws
     async for message in ws:
         if message == '':
-            message = '内容不能为空'
+            message = '主人来跟我聊天吧'
         msg_content = message
         print(f'recv: {message}')
-        SSML_text=0
-        output_path = 'output_'+ str(int(time.time()*1000))
-        await mainSeq(SSML_text, output_path)
-        print('exit')
-        await ws.send(b'\x03\xe8')
+        result = hashtable.check(msg_content)
+        if result == None:
+            SSML_text=0
+            output_path = 'output_'+ str(int(time.time()*1000))
+            await mainSeq(SSML_text, output_path)
+            print('exit')
+            await ws.send(b'\x03\xe8')
+        else:
+            print('>>>>>>'+result)
+            with open(result, 'rb') as f:
+                res = f.read(44)
+                while True:
+                    res = f.read(1024)
+                    if len(res) == 0:
+                        break
+                    await ws_fd.send(res)
+            await ws.send(b'\x03\xe8')
+
 
 
     '''
@@ -173,11 +188,13 @@ async def gate(ws):
     '''
 
 async def main():
-    async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
+    #async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
+    async with websockets.serve(gate, "192.168.31.162", 8766, max_size = 10752000):
         await asyncio.Future()  # run forever
 
 
 if __name__ == "__main__":
+    hashtable.load(r'table.json')
     '''
     args = parseArgs()
     SSML_text = get_SSML(args.input)
