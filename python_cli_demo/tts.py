@@ -15,9 +15,6 @@ from pydub import AudioSegment
 
 import websocket as ws
 
-ws_fd = object()
-msg_content = ''
-
 '''命令行参数解析'''
 def parseArgs():
     parser = argparse.ArgumentParser(description='text2speech')
@@ -46,11 +43,9 @@ def getXTime():
     return fr(str(now.year)) + '-' + fr(str(now.month)) + '-' + fr(str(now.day)) + 'T' + fr(hr_cr(int(now.hour))) + ':' + fr(str(now.minute)) + ':' + fr(str(now.second)) + '.' + str(now.microsecond)[:3] + 'Z'
 
 # Async function for actually communicating with the websocket
-async def transferMsTTSData(SSML_text, outputPath):
+async def transferMsTTSData(SSML_text, outputPath, ws_fd, msg_content):
     start = getXTime()
     print("\nauth time start:" + start +"\n")
-    global ws_fd
-    global msg_content
 
     endpoint1 = "https://azure.microsoft.com/en-gb/services/cognitive-services/text-to-speech/"
     r = requests.get(endpoint1)
@@ -123,8 +118,7 @@ async def transferMsTTSData(SSML_text, outputPath):
         sound.export(f'{outputPath}.wav', format="wav")
         start = getXTime()
         print("\nready send...:" + start +"\n")
-        url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
-        hashtable.add(msg_content, f'{outputPath}.wav')
+        #url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
         with open(f'{outputPath}.wav', 'rb') as f:
             res = f.read(44)
             while True:
@@ -132,10 +126,10 @@ async def transferMsTTSData(SSML_text, outputPath):
                 if len(res) == 0:
                     break
                 await ws_fd.send(res)
+        hashtable.add(msg_content, f'{outputPath}.wav')
 
-
-async def mainSeq(SSML_text, outputPath):
-    await transferMsTTSData(SSML_text, outputPath)
+async def mainSeq(SSML_text, outputPath, ws_fd, msg):
+    await transferMsTTSData(SSML_text, outputPath, ws_fd, msg)
 
 def get_SSML(path):
     with open(path,'r',encoding='utf-8') as f:
@@ -146,21 +140,16 @@ async def gate(ws):
     while True:
         msg_content = await ws.recv()
     '''
-    global ws_fd
-    global msg_content
-    ws_fd = ws
     async for message in ws:
         if message == '':
             message = '主人来跟我聊天吧'
-        msg_content = message
-        print(f'recv: {message}')
-        result = hashtable.check(msg_content)
+        print(f'{getXTime()}  recv: {message}')
+        result = hashtable.check(message)
         if result == None:
             SSML_text=0
             output_path = 'output_'+ str(int(time.time()*1000))
-            await mainSeq(SSML_text, output_path)
+            await mainSeq(SSML_text, output_path, ws, message)
             print('exit')
-            await ws.send(b'\x03\xe8')
         else:
             print('>>>>>>'+result)
             with open(result, 'rb') as f:
@@ -169,8 +158,8 @@ async def gate(ws):
                     res = f.read(1024)
                     if len(res) == 0:
                         break
-                    await ws_fd.send(res)
-            await ws.send(b'\x03\xe8')
+                    await ws.send(res)
+        await ws.send(b'\x03\xe8')
 
 async def main():
     #async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
