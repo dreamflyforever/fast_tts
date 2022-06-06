@@ -6,8 +6,13 @@ dic = {}
 
 def load(table):
     f = open(table, 'r', encoding="utf-8")
-    dic1 = json.loads(f.read())
-    dic.update(dic1)
+    content = f.read()
+    if len(content) == 0:
+        pass
+    else:
+        print('content is no None')
+        dic1 = json.loads(content)
+        dic.update(dic1)
     f.close()
     #print(dic)
 
