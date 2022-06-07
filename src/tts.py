@@ -1,5 +1,5 @@
-# 来源 https://github.com/OS984/DiscordBotBackend/blob/3b06b8be39e4dbc07722b0afefeee4c18c136102/NeuralTTS.py
-# A completely innocent attempt to borrow proprietary Microsoft technology for a much better TTS experience
+#!/usr/bin/python
+# encoding: utf-8
 import requests
 import websockets
 import asyncio
@@ -9,19 +9,27 @@ import re
 import uuid
 import argparse
 import hashtable
-
+from sub_thread import *
 from os import path
 from pydub import AudioSegment
+import shutil
+import os
 
-import websocket as ws
+async def ws_out(fd, ws_fd):
+    print('ws out....')
+    with open(fd, 'rb') as f:
+        res = f.read(44)
+        while True:
+            res = f.read(1024)
+            if len(res) == 0:
+                break
+                await ws_fd.send(res)
 
-'''命令行参数解析'''
-def parseArgs():
-    parser = argparse.ArgumentParser(description='text2speech')
-    parser.add_argument('--input', dest='input', help='SSML(语音合成标记语言)的路径', type=str, required=True)
-    parser.add_argument('--output', dest='output', help='保存mp3文件的路径', type=str, required=False)
-    args = parser.parse_args()
-    return args
+def ws_thread(path, ws_fd):
+    new_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(new_loop)
+    asyncio.get_event_loop().run_until_complete(ws_out(path, ws_fd))
+
 
 # Fix the time to match Americanisms
 def hr_cr(hr):
@@ -46,7 +54,7 @@ def getXTime():
 async def transferMsTTSData(SSML_text, outputPath, ws_fd, msg_content):
     start = getXTime()
     print("\nauth time start:" + start +"\n")
-
+    global event_loop
     endpoint1 = "https://azure.microsoft.com/en-gb/services/cognitive-services/text-to-speech/"
     r = requests.get(endpoint1)
     main_web_content = r.text
@@ -110,7 +118,6 @@ async def transferMsTTSData(SSML_text, outputPath, ws_fd, msg_content):
                 break
         start = getXTime()
         print("\nrecv time end:" + start +"\n")
-        print('.........')
         with open(f'{outputPath}.mp3', 'wb') as audio_out:
             audio_out.write(audio_stream)
         sound = AudioSegment.from_mp3(f'{outputPath}.mp3')
@@ -126,7 +133,14 @@ async def transferMsTTSData(SSML_text, outputPath, ws_fd, msg_content):
                 if len(res) == 0:
                     break
                 await ws_fd.send(res)
+        '''
+
+        thread_run(ws_thread(f'{outputPath}.wav', ws_fd))
+
+        '''
         hashtable.add(msg_content, f'{outputPath}.wav')
+        shutil.move(f'{outputPath}.wav', f'/data/')
+        os.remove(f'{outputPath}.mp3')
 
 async def mainSeq(SSML_text, outputPath, ws_fd, msg):
     await transferMsTTSData(SSML_text, outputPath, ws_fd, msg)
@@ -152,7 +166,7 @@ async def gate(ws):
             print('exit')
         else:
             print('>>>>>>'+result)
-            with open(result, 'rb') as f:
+            with open(f'/data/{result}', 'rb') as f:
                 res = f.read(44)
                 while True:
                     res = f.read(1024)
@@ -162,9 +176,8 @@ async def gate(ws):
         await ws.send(b'\x03\xe8')
 
 async def main():
-    #async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
-    #async with websockets.serve(gate, "192.168.31.162", 8766, max_size = 10752000):
-    async with websockets.serve(gate, "192.168.52.98", 8766, max_size = 10752000):
+    #async with websockets.serve(gate, "192.168.52.98", 8766, max_size = 10752000):
+    async with websockets.serve(gate, "0.0.0.0", 8766, max_size = 10752000):
         await asyncio.Future()  # run forever
 
 

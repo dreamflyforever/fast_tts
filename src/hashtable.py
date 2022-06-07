@@ -10,7 +10,6 @@ def load(table):
     if len(content) == 0:
         pass
     else:
-        print('content is no None')
         dic1 = json.loads(content)
         dic.update(dic1)
     f.close()
