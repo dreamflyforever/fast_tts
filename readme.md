@@ -20,3 +20,6 @@ https://azure.microsoft.com/zh-cn/services/cognitive-services/text-to-speech/#ov
 | 易用性         | 无UI界面需要一定的学习成本                                   | 简单易用，原有网页添加下载音频按钮，其他使用方法相同         |
 | 扩展性和灵活性 | 易扩展更灵活                                                 | 相对不易扩展                                                 |
 
+### usage
+开启服务器python tts.py
+使用客户端测试python tts_client.py

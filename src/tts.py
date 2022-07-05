@@ -1,5 +1,5 @@
-# 来源 https://github.com/OS984/DiscordBotBackend/blob/3b06b8be39e4dbc07722b0afefeee4c18c136102/NeuralTTS.py
-# A completely innocent attempt to borrow proprietary Microsoft technology for a much better TTS experience
+#!/usr/bin/python
+# encoding: utf-8
 import requests
 import websockets
 import asyncio
@@ -8,22 +8,28 @@ import time
 import re
 import uuid
 import argparse
-
+import hashtable
+from sub_thread import *
 from os import path
 from pydub import AudioSegment
+import shutil
+import os
 
-import websocket as ws
+async def ws_out(fd, ws_fd):
+    print('ws out....')
+    with open(fd, 'rb') as f:
+        res = f.read(44)
+        while True:
+            res = f.read(1024)
+            if len(res) == 0:
+                break
+                await ws_fd.send(res)
 
-ws_fd = object()
-msg_content = ''
+def ws_thread(path, ws_fd):
+    new_loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(new_loop)
+    asyncio.get_event_loop().run_until_complete(ws_out(path, ws_fd))
 
-'''命令行参数解析'''
-def parseArgs():
-    parser = argparse.ArgumentParser(description='text2speech')
-    parser.add_argument('--input', dest='input', help='SSML(语音合成标记语言)的路径', type=str, required=True)
-    parser.add_argument('--output', dest='output', help='保存mp3文件的路径', type=str, required=False)
-    args = parser.parse_args()
-    return args
 
 # Fix the time to match Americanisms
 def hr_cr(hr):
@@ -45,9 +51,10 @@ def getXTime():
     return fr(str(now.year)) + '-' + fr(str(now.month)) + '-' + fr(str(now.day)) + 'T' + fr(hr_cr(int(now.hour))) + ':' + fr(str(now.minute)) + ':' + fr(str(now.second)) + '.' + str(now.microsecond)[:3] + 'Z'
 
 # Async function for actually communicating with the websocket
-async def transferMsTTSData(SSML_text, outputPath):
-    global ws_fd
-    global msg_content
+async def transferMsTTSData(SSML_text, outputPath, ws_fd, msg_content):
+    start = getXTime()
+    print("\nauth time start:" + start +"\n")
+    global event_loop
     endpoint1 = "https://azure.microsoft.com/en-gb/services/cognitive-services/text-to-speech/"
     r = requests.get(endpoint1)
     main_web_content = r.text
@@ -83,8 +90,7 @@ async def transferMsTTSData(SSML_text, outputPath):
             getXTime() + '\r\nContent-Type: application/ssml+xml\r\n\r\n' + payload_3
         await websocket.send(message_3)
         start = getXTime()
-        print(start)
-
+        print("\nauth time end:" + start +"\n")
         # Checks for close connection message
         end_resp_pat = re.compile('Path:turn.end')
         audio_stream = b''
@@ -110,13 +116,16 @@ async def transferMsTTSData(SSML_text, outputPath):
                         pass
             else:
                 break
-        print('.........')
+        start = getXTime()
+        print("\nrecv time end:" + start +"\n")
         with open(f'{outputPath}.mp3', 'wb') as audio_out:
             audio_out.write(audio_stream)
         sound = AudioSegment.from_mp3(f'{outputPath}.mp3')
         sound = sound.set_channels(2)
         sound.export(f'{outputPath}.wav', format="wav")
-        url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
+        start = getXTime()
+        print("\nready send...:" + start +"\n")
+        #url= 'http://192.168.73.249:8000/' + f'{outputPath}.wav'
         with open(f'{outputPath}.wav', 'rb') as f:
             res = f.read(44)
             while True:
@@ -124,10 +133,17 @@ async def transferMsTTSData(SSML_text, outputPath):
                 if len(res) == 0:
                     break
                 await ws_fd.send(res)
+        '''
 
+        thread_run(ws_thread(f'{outputPath}.wav', ws_fd))
 
-async def mainSeq(SSML_text, outputPath):
-    await transferMsTTSData(SSML_text, outputPath)
+        '''
+        hashtable.add(msg_content, f'{outputPath}.wav')
+        shutil.move(f'{outputPath}.wav', f'/data/')
+        os.remove(f'{outputPath}.mp3')
+
+async def mainSeq(SSML_text, outputPath, ws_fd, msg):
+    await transferMsTTSData(SSML_text, outputPath, ws_fd, msg)
 
 def get_SSML(path):
     with open(path,'r',encoding='utf-8') as f:
@@ -138,43 +154,34 @@ async def gate(ws):
     while True:
         msg_content = await ws.recv()
     '''
-    global ws_fd
-    global msg_content
-    ws_fd = ws
     async for message in ws:
         if message == '':
-            message = '内容不能为空'
-        msg_content = message
-        print(f'recv: {message}')
-        SSML_text=0
-        output_path = 'output_'+ str(int(time.time()*1000))
-        await mainSeq(SSML_text, output_path)
-        print('exit')
+            message = '主人来跟我聊天吧'
+        print(f'{getXTime()}  recv: {message}')
+        result = hashtable.check(message)
+        if result == None:
+            SSML_text=0
+            output_path = 'output_'+ str(int(time.time()*1000))
+            await mainSeq(SSML_text, output_path, ws, message)
+            print('exit')
+        else:
+            print('>>>>>>'+result)
+            with open(f'/data/{result}', 'rb') as f:
+                res = f.read(44)
+                while True:
+                    res = f.read(1024)
+                    if len(res) == 0:
+                        break
+                    await ws.send(res)
         await ws.send(b'\x03\xe8')
 
-
-    '''
-    msg_content = await ws.recv()
-    print(f'recv: {msg_content}')
-    SSML_text=0
-    output_path = 'output_'+ str(int(time.time()*1000))
-    await mainSeq(SSML_text, output_path)
-    print('-----exit')
-    '''
-
 async def main():
-    async with websockets.serve(gate, "192.168.73.249", 8766, max_size = 10752000):
+    #async with websockets.serve(gate, "192.168.52.98", 8766, max_size = 10752000):
+    async with websockets.serve(gate, "0.0.0.0", 8766, max_size = 10752000):
         await asyncio.Future()  # run forever
 
 
 if __name__ == "__main__":
-    '''
-    args = parseArgs()
-    SSML_text = get_SSML(args.input)
-    output_path = args.output if args.output else 'output_'+ str(int(time.time()*1000))
-    asyncio.get_event_loop().run_until_complete(mainSeq(SSML_text, output_path))
-    '''
+    hashtable.load(r'table.json')
     asyncio.run(main())
     print('completed')
-    # python tts.py --input SSML.xml
-    # python tts.py --input SSML.xml --output 保存文件名
