@@ -12,5 +12,5 @@ RUN pip install --upgrade pip
 RUN pip install  -r  /workspace/requirements.txt
 RUN pip install pydub
 
-ENTRYPOINT [ "python3", "./tts.py"]
-#CMD [ "python3", "./tts.py" ]
+ENTRYPOINT [ "python3", "./tts_server.py"]
+#CMD [ "python3", "./tts_server.py" ]
