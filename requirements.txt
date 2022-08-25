@@ -1,2 +1,11 @@
-requests==2.15.1
-websockets==10.2
+certifi==2022.6.15
+charset-normalizer==2.1.1
+idna==3.3
+pycairo==1.21.0
+pydub==0.25.1
+PyGObject==3.42.2
+requests==2.28.1
+six==1.16.0
+urllib3==1.26.12
+websocket-client==1.4.0
+websockets==10.3
