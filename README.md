@@ -16,3 +16,10 @@ https://azure.microsoft.com/zh-cn/services/cognitive-services/text-to-speech/#ov
 
 ### license
 NO MIT by Jim
+
+### requests
+pip3 install pydub
+pip3 install websockets
+pip3 install websocket_client
+pip3 install requests
+pip3 install requests
